@@ -15,7 +15,7 @@ Fama and French(1992)：The Cross-Section Of Expected Stock Returns
 
 >Estimate βs using the full sample (330 months) of post-ranking returns on each of the 100 portfolios, with the CRSP value-weighted portfolio of NYSE, AMEX, and (after 1972) NASDAQ stocks used as the proxy for the market
 
->estimate β as the sum of the slopes in the regression of the return on a portfolio on the current and prior month’s market return to adjust for nonsynchronous trading
+>Estimate β as the sum of the slopes in the regression of the return on a portfolio on the current and prior month’s market return to adjust for nonsynchronous trading
 
 >Allocate the full-period post-ranking β of a size-β portfolio to each stock in the portfolio. These are the βs that will be used in the Fama-MacBeth cross-sectional regressions for individual stocks.
 
@@ -27,10 +27,14 @@ Fama and French(1992)：The Cross-Section Of Expected Stock Returns
 i. β & size
 
 ![](https://github.com/sunxy-pbcsf/Sun-Xinyu/blob/master/Table%20I.jpg)
->Properties of Portfolios Formed on Size or Pre-Ranking β:
->按规模或Pre-Ranking β分组的组合性质
+> Properties of Portfolios Formed on Size or Pre-Ranking β:
+> 按规模或Pre-Ranking β分组的组合性质
 
 ![](https://github.com/sunxy-pbcsf/Sun-Xinyu/blob/master/Table%20II.jpg)
 > Average Returns, Post-Ranking βs and Average Size For Portfolios Formed on Size and then β
->规模-贝塔组合的平均回报，Post-Ranking βs与平均规模
+> 规模-贝塔组合的平均回报，Post-Ranking βs与平均规模
+
+>Contrary to the central prediction of the SLB model, the second-pass β sort produces little variation in average returns
+
+>Although the post-ranking βs in Table I increase strongly in each size decile, average returns are flat or show a slight tendency to decline. In contrast, within the columns of the average return and β matrices of Table I, average returns and βs decrease with increasing size
 
