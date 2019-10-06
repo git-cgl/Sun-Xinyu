@@ -25,5 +25,6 @@ Fama and French(1992)：The Cross-Section Of Expected Stock Returns
 >(b) the combination of size and book-to-market equity seems to absorb the roles of leverage and E/P in average stock returns, at least during our 1963-1990 sample period.
 
 i. β & size
-!(E:\博士资料库\博二上\实证资产定价\Fama 1992\Table II.png)
+
+!(E:\博士资料库\博二上\实证资产定价\Fama 1992\Table II.jpg)
 
