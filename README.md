@@ -19,9 +19,10 @@ Fama and French(1992)：The Cross-Section Of Expected Stock Returns
 
 >Allocate the full-period post-ranking β of a size-β portfolio to each stock in the portfolio. These are the βs that will be used in the Fama-MacBeth cross-sectional regressions for individual stocks.
 
-* 2. Result
+* 2.Result
 >(a) β does not seem to help explain the cross-section of average stock returns(with control of size effect)
 
 >(b) the combination of size and book-to-market equity seems to absorb the roles of leverage and E/P in average stock returns, at least during our 1963-1990 sample period.
 
-** 2.1 β & size
+2. β & size
+
