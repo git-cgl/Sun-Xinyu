@@ -26,11 +26,11 @@ Fama and French(1992)：The Cross-Section Of Expected Stock Returns
 
 i. β & size
 
-!(http://www.jijitang.com/photos/4b8e06f0-eb45-11e8-90f9-77961b66a500.jpg)
+![](http://www.jijitang.com/photos/4b8e06f0-eb45-11e8-90f9-77961b66a500.jpg)
 >Properties of Portfolios Formed on Size or Pre-Ranking β:
 按规模或Pre-Ranking β分组的组合性质
 
-!(http://www.jijitang.com/photos/983ebf80-eb45-11e8-90f9-77961b66a500.jpg)
+![](http://www.jijitang.com/photos/983ebf80-eb45-11e8-90f9-77961b66a500.jpg)
 > Average Returns, Post-Ranking βs and Average Size For Portfolios Formed on Size and then β
 规模-贝塔组合的平均回报，Post-Ranking βs与平均规模
 
