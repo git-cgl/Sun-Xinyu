@@ -26,5 +26,5 @@ Fama and French(1992)：The Cross-Section Of Expected Stock Returns
 
 i. β & size
 
-!(E:\博士资料库\博二上\实证资产定价\Fama 1992\Table II.jpg)
+!(http://www.jijitang.com/photos/4b8e06f0-eb45-11e8-90f9-77961b66a500.jpg)
 
