@@ -23,7 +23,7 @@ library(dplyr)         # Data wrangling
 # (1) CRSP Data setup
 #-----------------------------------
 
-setwd("/run/media/john/1TB/Projects/Fama-French Replicatoin/")
+setwd("E:/博士资料库/博二上/实证资产定价/Fama 1992")
 crsp <- read_csv(("Crsp.csv"))
 # crsp2 <- read.csv("Crsp.csv", stringsAsFactors = FALSE)
 
