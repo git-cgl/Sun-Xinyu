@@ -20,7 +20,7 @@ library(dplyr)         # Data wrangling
 
 
 #-----------------------------------
-# (1) CRSP Data setup
+# (1) CRSP Data setup/Adjustment/Size and Pre-ranking beta double-sorting/Post-ranking beta calculation
 #-----------------------------------
 
 library(readxl);library(dplyr);library(zoo);library(purrr);library(StatMeasures);
