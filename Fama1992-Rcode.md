@@ -275,13 +275,20 @@ for(i in namelist){
   }
   
   ##extract specific column or row,which should be supplemented with var[xxxx,]
-  
+ 
+Still a bit more revision on this version of code made in progress
+Q1: why post-ranking beta seemingly a little bit less than F&F Table-1, mostly centered btw 0-1?
+
+
+Another data cleaning example cited from Google Search:
+ 
+ 
 #----------------------------------------
 # (**) CRSP and Compustat Data Merge
 #----------------------------------------
                  
                                             
-setwd("/run/media/john/1TB/Projects/Fama-French Replicatoin/")
+setwd("/ /")
 
 compustat <- read.csv("Compustat.csv", header = TRUE, stringsAsFactors = FALSE)
 crsp <- read.csv("Crsp.csv", header = TRUE, stringsAsFactors = FALSE)
