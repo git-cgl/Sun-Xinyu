@@ -14,7 +14,7 @@
 #-------------------------------------------------------------------------------------------------------
 ########################################################################################################
 
-rm(list=ls(all=TRUE))
+rm(list=ls(all=TRUE)) ##clear all memory on previous program
 library(readr)         # For reading the data
 library(dplyr)         # Data wrangling
 
@@ -232,7 +232,7 @@ for(i in namelist){
       mutate(portreturn21=portreturn2[]-rf1[])%>%
       select(portreturn21,sum2)%>%unique()
     {
-      l=coefficients(lm(test$portreturn21~test$sum2+lag(test$sum2)))
+      l=coefficients(lm(test$portreturn21~test$sum2+lead(test$sum2)))
       beta=l[2]+l[3]
       panelB[i,1]=beta
     }
@@ -243,19 +243,19 @@ for(i in namelist){
       mutate(portreturn21=portreturn2[]-rf1[])%>%
       select(portreturn21,sum2)%>%unique()
     {
-      l=coefficients(lm(test$portreturn21~test$sum2+lag(test$sum2)))
+      l=coefficients(lm(test$portreturn21~test$sum2+lead(test$sum2)))
       beta=l[2]+l[3]
       panelB[1,i]=beta
     }
     for(j in 2:11){
       test=crsp12[crsp12$portfo==i-1&crsp12$portfo2==j-1,]%>%
-      group_by(t,month,portfo,portfo2)%>%
+      group_by(t,month)%>%
       mutate(portreturn=mean(Returns))%>%
       arrange(desc(t),desc(month))%>%
       mutate(portreturn21=portreturn[]-rf1[])%>%
       select(portreturn21,sum2)%>%unique()
         {
-          l=coefficients(lm(test$portreturn21~test$sum2+lag(test$sum2)))
+          l=coefficients(lm(test$portreturn21~test$sum2+lead(test$sum2)))
           beta=l[2]+l[3]
           panelB[i,j]=beta
         }
