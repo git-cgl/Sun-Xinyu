@@ -2,7 +2,7 @@
 ########################################################################################################
 #-------------------------------------------------------------------------------------------------------
 # Author    : Sun Xinyu
-# Date      : 10/06/2019
+# Date      : 11/02/2019
 # Filename  : Fama1992-Rcode.md
 # Code      : Fama-French 1992 Replication 
 # Sections  : 
@@ -23,237 +23,259 @@ library(dplyr)         # Data wrangling
 # (1) CRSP Data setup
 #-----------------------------------
 
+library(readxl);library(dplyr);library(zoo);library(purrr);library(StatMeasures);
+require(data.table); library(lubridate)
 setwd("E:/博士资料库/博二上/实证资产定价/Fama 1992")
-crsp <- read_csv(("Crsp.csv"))
-# crsp2 <- read.csv("Crsp.csv", stringsAsFactors = FALSE)
+compustat = read_excel("Comp.xlsx") #Comp
+crsp=read_excel("Crsp.xlsx") #Crsp
+Price=read_excel("Price.xlsx") #Price
+Rf=read_excel("bond.xlsx")
+crsp01=crsp%>%left_join(Price) 
 
-# Convert colnames to lower case
+comp=compustat%>%rename(sic=`Standard Industry Classification Code`)%>%
+  filter(sic>6999|sic<6000)%>%
+  filter(`Stock Exchange Code`==11|`Stock Exchange Code`==12|`Stock Exchange Code`==14)%>%
+ # rename(permno=`Historical CRSP PERMNO Link to COMPUSTAT Record`)%>%
+  rename(share=`Common Shares Outstanding`)%>%
+  rename(price12=`Price Close - Annual - Calendar`)%>%
+  rename(date=`Data Date`)%>%
+  rename(ticker=`Ticker Symbol`)%>%
+  rename(exchange=`Stock Exchange Code`)%>%
+  rename(BE=`Book Value Per Share`)
 
-colnames(crsp) <- tolower(colnames(crsp))
-
-# Fix missing fyears
-crsp$fyear <- substr(crsp$date, 1, 4)
-
-# Add Month
-
-crsp$month <- substr(crsp$date, 5, 6)
-# Only keep those stocks with returns at the end of June
-# crsp <- crsp %>%
-#   group_by(permco, fyear) %>%
-#   mutate(month = substr(date, 5, 6),
-#          has_June = any(month == "06"))
-# 
-# crsp <- filter(crsp, has_June == TRUE)
-
-# Only keep those stocks with returns at the end of December
-# crsp <- crsp %>%
-#   group_by(permco, fyear) %>%
-#   mutate(month = substr(date, 5, 6),
-#          has_Dec = any(month == "12"))
-# 
-# crsp <- filter(crsp, has_Dec == TRUE)
-
-# Calculate Market Equity (ME) : ME = prc*shrout
-crsp$me <- (abs(crsp$prc)*crsp$shrout)/1000
-crsp <- filter(crsp, me > 0)   # Ensure has me
-
-# Remove all obs outside July 1962 - Dec 1990 ( Because of lag need to include 1962)
-crsp <- filter(crsp, date >= 19620700 & date <= 19901231)
-
-# Keep only share code 10, 11
-crsp <- filter(crsp, shrcd == 10 | shrcd == 11)
-
-# Remove ret with C as value
-crsp <- filter(crsp, ret != "C")
-crsp$ret <- as.numeric(crsp$ret)
-
-# Write to full sample
-write_csv(crsp, "crsp_92_data.csv")
-
-#---------------------------------------------------------
-# (2) Table 1 pre-beta, post-beta, post-beta (ln(ME))
-#---------------------------------------------------------
-
-library(dplyr)
-library(readr)
-
-setwd("/run/media/john/1TB/Projects/Fama-French Replicatoin/")
-crsp <- read_csv("crsp_92_data.csv")
-
-# Select only columns needed
-crsp <- select(crsp, permco,date, ret, vwretd, ewretd, fyear, month, me)
-
-# Get 10% decile ME for each June and assign to portfolio
-crsp$fyear <- as.integer(crsp$fyear)
-crsp$month <- as.integer(crsp$month)
-
-# Build portfolios based on ME
-crsp$portfo=cut(crsp$me, breaks=quantile(crsp$me,probs=seq(0,1,1/10),na.rm=T),labels=F)
-
-# Lag ewretd
-crsp <- crsp %>% 
-  group_by(permco) %>% 
-  arrange(desc(date)) %>% 
-  mutate(lagewretd = lag(ewretd))
-
-# Remove initial lagged variables
-crsp <- filter(crsp, lagewretd != "NA")
-
-## convert fyear to a proper number and then exploit for sorting
-crsp <- crsp %>%
-  mutate(fyear = fyear %>% as.integer) %>%
-  arrange(fyear, month)
-
-## figure out cumulative months available for each year (for each permco)
-years <- crsp %>%  
-  group_by(permco, fyear) %>% 
-  summarize(n = n()) %>% 
-  mutate(n_cum = cumsum(n)) 
-
-# function to get coefficients 
-# (further optimization should probably focus on improving this function)
-get_coefs <- function(.permco, .fyear, .n_cum){
-  if(.n_cum < 24) {
-    data_frame(`(Intercept)` = NA_real_, ewretd = NA_real_, lagewretd = NA_real_)
-  } else {
-    my_dat <- crsp %>%
-      filter(permco == .permco, fyear <= .fyear) %>%
-      mutate(rn = row_number(desc(date)))
-    lm(ret ~ ewretd + lagewretd, my_dat, subset = rn < 61) %>% 
-      coef %>% 
-      as.list %>% 
-      as_data_frame
-  }
-}
-
-# dplyr option (Takes ~ 2 hours)
-models_dplyr <- years %>% 
-  group_by(fyear, permco) %>%
-  do(get_coefs(.$permco, .$fyear, .$n_cum))
-
-# Remove NA's
-models_dplyr <- filter(models_dplyr, ewretd != "NA" | lagewretd != "NA")
-models_dplyr$sum <- models_dplyr$ewretd + models_dplyr$lagewretd
-
-# Write out to save
-write.csv(models_dplyr, "prerank_betas.csv")
-
-# Read prerank
-models_dplyr <- read_csv("prerank_betas.csv")
-
-
-# Merge with crsp data set
-merge <- select(crsp, permco, portfo, me, ret, fyear, month)
-prerank <- inner_join(models_dplyr, merge, by = "permco")
-
-# Sum ewretd and lagewretd to get pre-beta
-prerank_betas <- prerank %>% 
-  group_by(permco) %>% 
-  summarize(pre_beta = mean(sum), ret = mean(ret), me = mean(me), ewr = mean(ewretd))
-
-# Rank pre-betas and me
-prerank_betas$beta_rank=cut(prerank_betas$pre_beta, breaks=quantile(prerank_betas$pre_beta, probs=seq(0,1,1/10), na.rm=T),labels=F)
-prerank_betas$portfo=cut(prerank_betas$me, breaks=quantile(prerank_betas$me,probs=seq(0,1,1/10),na.rm=T),labels=F)
-
-prerank_betas <- filter(prerank_betas, beta_rank != "NA" & portfo != "NA")
-
-# Build data frame for pre-ranking betas
-
-df <- prerank_betas %>%
-  group_by(portfo, beta_rank) %>%
-  summarise(mer = mean(ewr))
-
-df <- prerank_betas %>%
-  group_by(beta_rank) %>%
-  summarise(mer = mean(ewr))
-df
+crsp1=crsp01%>%rename(price=`Price or Bid/Ask Average`)%>%
+  rename(sic=`Standard Industrial Classification Code`)%>%
+  rename(ticker=`Ticker Symbol`)%>%
+  rename(exchange=`Exchange Code`)%>%
+  rename(date=`Names Date`)%>%
+  rename(cusip=`CUSIP Header`)%>%
+  rename(share=`Shares Outstanding`)%>%
+ # rename(vwrm=`Value-Weighted Return-incl. dividends`)%>%
+#  rename(ewrm=`Equal-Weighted Return-incl. dividends`)%>%
+  rename(permno=`PERMNO`)%>%
+  rename(shrcd=`Share Code`)%>%
+  filter(sic>6999|sic<6000)
   
-table1a <- read_csv("/home/john/Dropbox/UHM/Classes/Fin 701 - International Finance Theory/Replication/Table1_A.csv")
-table1a
+crsp2=crsp1%>%  
+  mutate(t=floor((date-700)/10000))%>%
+  group_by(permno,t)%>%
+  mutate(year=substr(date,1,4))%>%
+  mutate(month=substr(date, 5, 6),
+                   has_June=any(month=="06"))%>%
+  #mutate(month=substr(date, 5, 6),has_Dec=any(month=="12"))%>%
+  mutate(yearmonth=substr(date,1,6))%>%
+  filter(has_June==TRUE)%>%
+  #filter(has_Dec==TRUE)%>%
+  filter(shrcd==10|shrcd==11|(is.na(shrcd)&!is.na(price)))%>%
+  filter(exchange==1|exchange==2|exchange==3)%>%
+  mutate(price1=abs(price))%>%
+  filter(Returns!="C"&Returns!="B")
 
-# Table 1B - Post Ranking Betas
+crsp2$Returns=as.numeric(crsp2$Returns) #as.integer
+Rf=Rf%>%mutate(rf1=rf/100)%>%select(yearmonth,rf1)
+crsp2$yearmonth=as.numeric(crsp2$yearmonth)
+crsp2=crsp2%>%left_join(Rf)
+crsp2$Returns1=crsp2$Returns[]-crsp2$rf1[] #calculate excess return
 
-# Function to get coef
-get_postcoefs <- function(portfo){
-    my_dat <- prerank_betas %>%
-      filter(portfo == portfo) %>%
-    lm(ret ~ ewr, my_dat) %>% 
-      coef %>% 
-      as.list %>% 
-      as_data_frame
-}
-
-
-postrank <- prerank_betas %>%
-  group_by(portfo) %>%
-  do(get_postcoefs(.$portfo))
-
-postrank <- prerank_betas
-postbetas <- data.frame(LowB = numeric(),
-                        B2 = numeric(),
-                        B3 = numeric(),
-                        B4 = numeric(),
-                        B5 = numeric(),
-                        B6 = numeric(),
-                        B7 = numeric(),
-                        B8 = numeric(),
-                        B9 = numeric(),
-                        B10 = numeric())
-
-size <- data.frame(LowB = numeric(),
-                        B2 = numeric(),
-                        B3 = numeric(),
-                        B4 = numeric(),
-                        B5 = numeric(),
-                        B6 = numeric(),
-                        B7 = numeric(),
-                        B8 = numeric(),
-                        B9 = numeric(),
-                        B10 = numeric())
-
-# Get Post Rank Betas
-for (i in unique(postrank$portfo)){
-  for (j in unique(postrank$beta_rank)) {
-    frame <- filter(postrank, portfo == i & beta_rank == j)
-    postbetas[[i,j]] <- as.numeric(lm(ret ~ ewr, data = frame)$coefficients[2]*100)
-  }
-}
-
-# All post rank betas for portfolio rank
-for (i in unique(postrank$portfo)){
-  frame <- filter(postrank, portfo == i)
-  betas[[i]] <- lm(ret ~ ewr, data = frame)$coefficients[2]
-}
-                                   
-
-# Get all post rank betas for beta rank
-for (i in unique(postrank$beta_rank)){
-    frame <- filter(postrank, beta_rank == i)
-    betas[[i]] <- lm(ret ~ ewr, data = frame)$coefficients[2]
-  }
-
-# Get all betas for portfo data frame
-for (i in unique(postrank$portfo)){
-    frame <- filter(postrank, portfo == i & beta_rank == j)
-    size[[i,j]] <- mean(log(frame$me))
-  }
-
-# Get all betas for beta data frame
-for (i in unique(postrank$beta_rank)){
-    frame <- filter(postrank, portfo == i & beta_rank == j)
-    size[[i,j]] <- mean(log(frame$me))
-  }
-}
-
-portsize <- postrank %>%
-  group_by(portfo) %>%
-  summarize(sizeme = mean(log(me)))
+crsp2$ME=crsp2$price1*crsp2$share/1000 ##calculate ME and filter as available
+filter(crsp2,ME>0)
   
-portsize <- postrank %>%
-  group_by(beta_rank) %>%
-  summarize(sizeme = mean(log(me)))
+crsp2$y=ifelse(crsp2$month=='06',crsp2$ME,NA) ## add fixed yearly ME for every stock 
+crsp21=crsp2%>%group_by(permno)%>%arrange(permno,t)%>%mutate(y1=lag(y,12))
+crsp3=crsp21%>%  
+  group_by(permno,t)%>%
+  mutate(MEt=sum(y1,na.rm = TRUE))%>%
+  filter(MEt!=0)
 
-### NOT FINISHED
+
+crsp3$month=as.numeric(crsp3$month)
+crsp3$year=as.numeric(crsp3$year)  
+crsp4=crsp3%>% ## figure out cumulative 24-60 months(for each permno)
+  group_by(permno)%>%
+  mutate(REt=lag(Returns1,24))%>%
+  filter(!is.na(REt))
+  
+NYSE=crsp4%>% ## NYSE size portfolio number
+  filter(exchange==1)%>%
+  filter(t>=1963)%>%  ##
+  group_by(t)%>%
+  mutate(portfo=decile(MEt))%>%
+  group_by(t,portfo)%>%
+  mutate(value=max(MEt))
+
+breakpoint=NYSE%>%select(t,portfo,value)%>%unique()%>%
+  arrange(t,portfo)# produce unique NYSE breakpoint value
+
+bkpt2=crsp4%>%left_join(NYSE)%>%filter(t>=1963) ##
+
+bkpt3=bkpt2%>%select(permno,t,portfo,MEt)%>%unique()
+
+for(i in 1:length(bkpt3$permno)){
+  if(is.na(bkpt3$portfo[i])==T){
+    test=breakpoint$value[breakpoint$t==bkpt3$t[i]]
+    k=1
+    while(k<10 & bkpt3$MEt[i]>test[k]){
+      k=k+1
+    }
+    bkpt3$portfo[i]=k
+  }
+}  ## merge other exchanges stock with NYSE portfo standard
+
+test2=crsp4%>%
+  select(t,permno,month,MEt)%>%
+  filter(month==6)%>%
+  group_by(t)%>%
+  mutate(sum1=sum(MEt))%>%
+  mutate(weight=MEt/sum1)%>%
+  mutate(lagweight=lag(weight))
+
+test3=test2%>%
+  select(t,permno,MEt,weight,lagweight)
+  
+crsp5=crsp4%>%
+  left_join(bkpt3)%>%
+  left_join(test3)%>%
+  group_by(t,month)%>%
+  mutate(val_wetReturn=Returns*lagweight)%>%
+  mutate(sum2=sum(val_wetReturn,na.rm = TRUE))
+
+crsp5$sum2=crsp5$sum2[]-crsp5$rf1[] # value-weighted portfolio Rm's excess return
+
+crsp6=crsp5%>%
+  select(t,permno,portfo,month,sum2,Returns1)%>%
+  group_by(permno)%>%
+  arrange(desc(t),desc(month))%>%
+  mutate(lagsum=lead(sum2)) #Find the "next" or "previous" values in a vector.
+
+crsp7=crsp5%>%
+  left_join(crsp6)
+
+namelist=crsp7$permno%>%
+  unique()
+
+crsp8=crsp7%>%
+  mutate(beta1=NA)
+
+for(i in namelist){
+  testpno=crsp6 %>% filter(permno==i)
+  year2=testpno$t%>% unique()
+  for(k in year2){
+    testpno2=testpno%>%
+    filter(t<k)
+    if(length(testpno2$month)>=24){
+      if(length(testpno2$month)>60){
+        testpno2=testpno2%>%arrange(desc(t),desc(month))
+        testpno2=testpno2[1:60,]
+      }
+      lm.pre=lm(testpno2$Returns1~testpno2$sum2+testpno2$lagsum)
+      preranking=coefficients(lm.pre)
+      beta=preranking[2]+preranking[3] 
+      crsp8$beta1[crsp8$permno==i&crsp8$t==k]=beta #数字
+    }
+  }
+}  
+
+  crsp9=crsp8%>%
+    left_join(crsp5)%>%
+    filter(is.na(beta1)==F)
+  
+  crsp10=crsp9%>%
+    filter(exchange==1)%>%
+    filter(t>=1963)%>%
+    group_by(portfo)%>%
+    mutate(portfo2=decile(beta1))%>%
+    group_by(portfo,portfo2)%>%
+    mutate(value2=max(beta1)) #在NYSE里求出beta的分组和临界点（最大值）
+ 
+   breakpoint2=crsp10%>%select(portfo,portfo2,value2)%>%unique()%>%
+    arrange(portfo2)# produce unique NYSE breakpoint value
+  
+  bkpt4=crsp9%>%left_join(crsp10)%>%filter(t>=1963) 
+  bkpt5=bkpt4%>%select(permno,exchange,portfo,portfo2,beta1,Returns,sum2,rf1,ME)%>%unique()
+  
+  for(i in 1:length(bkpt5$t)){
+    if(is.na(bkpt5$portfo2[i])==T){
+      test=breakpoint2$value2[breakpoint2$portfo==bkpt5$portfo[i]]
+      k=1
+      while(k<10 & bkpt5$beta1[i]>test[k]){
+        k=k+1
+      }
+      bkpt5$portfo2[i]=k
+    }
+  }
+  crsp11=bkpt5
+ # bkpt6=bkpt4%>%full_join(bkpt55)#%>%filter(is.na(Returns)==F)
+  # crsp11=crsp11%>%
+  #  left_join(bkpt5)%>%select(t,permno,portfo,sum2,Returns,portfo2)%>%
+  #  filter(is.na(portfo2)==F)
+
+
+  #Panel A
+  panelA=matrix(nrow = 11,ncol = 11)
+  panelA[1,1]=100*mean(crsp11$Returns)
+  for(i in 2:11){
+    panelA[i,1]=100*mean(crsp11$Returns[crsp11$portfo==i-1])
+    panelA[1,i]=100*mean(crsp11$Returns[crsp11$portfo2==i-1])
+    for(j in 2:11){
+      panelA[i,j]=100*mean(crsp11$Returns[crsp11$portfo==i-1&crsp11$portfo2==j-1])
+    }
+  }
+  
+  #Panel B
+  panelB=matrix(nrow = 11,ncol = 11)
+  crsp12=crsp11%>%group_by(t,month,portfo,portfo2)%>%mutate(portreturn=mean(Returns))
+  for(i in 2:11){
+    test=crsp12[crsp12$portfo==i-1,]%>%
+      group_by(t,month)%>%
+      mutate(portreturn2=mean(portreturn))%>%
+      arrange(desc(t),desc(month))%>%
+      mutate(portreturn21=portreturn2[]-rf1[])%>%
+      select(portreturn21,sum2)%>%unique()
+    {
+      l=coefficients(lm(test$portreturn21~test$sum2+lag(test$sum2)))
+      beta=l[2]+l[3]
+      panelB[i,1]=beta
+    }
+    test=crsp12[crsp12$portfo2==i-1,]%>%
+      group_by(t,month)%>%
+      mutate(portreturn2=mean(portreturn))%>%
+      arrange(desc(t),desc(month))%>%
+      mutate(portreturn21=portreturn2[]-rf1[])%>%
+      select(portreturn21,sum2)%>%unique()
+    {
+      l=coefficients(lm(test$portreturn21~test$sum2+lag(test$sum2)))
+      beta=l[2]+l[3]
+      panelB[1,i]=beta
+    }
+    for(j in 2:11){
+      test=crsp12[crsp12$portfo==i-1&crsp12$portfo2==j-1,]%>%
+      group_by(t,month,portfo,portfo2)%>%
+      mutate(portreturn=mean(Returns))%>%
+      arrange(desc(t),desc(month))%>%
+      mutate(portreturn21=portreturn[]-rf1[])%>%
+      select(portreturn21,sum2)%>%unique()
+        {
+          l=coefficients(lm(test$portreturn21~test$sum2+lag(test$sum2)))
+          beta=l[2]+l[3]
+          panelB[i,j]=beta
+        }
+    }
+  }
+  
+  #Panel C
+  crsp13=crsp11%>% mutate(lnME=log(ME))
+  panelC=matrix(nrow = 11,ncol = 11)
+  panelC[1,1]=mean(crsp13$lnME)
+  for(i in 2:11){
+    panelC[i,1]=mean(crsp13$lnME[crsp13$portfo==i-1])
+    panelC[1,i]=mean(crsp13$lnME[crsp13$portfo2==i-1])
+    for(j in 2:11){
+      panelC[i,j]=mean(crsp13$lnME[crsp13$portfo==i-1&crsp13$portfo2==j-1])
+    }
+  }
+  
+  ##extract specific column or row,which should be supplemented with var[xxxx,]
+  
 #----------------------------------------
 # (**) CRSP and Compustat Data Merge
 #----------------------------------------
