@@ -26,9 +26,9 @@ library(dplyr)         # Data wrangling
 library(readxl);library(dplyr);library(zoo);library(purrr);library(StatMeasures);
 require(data.table); library(lubridate)
 setwd("E:/博士资料库/博二上/实证资产定价/Fama 1992")
-compustat = read_excel("Comp.xlsx") #Comp
-crsp=read_excel("Crsp.xlsx") #Crsp
-Price=read_excel("Price.xlsx") #Price
+compustat = read_excel("1963-2018 Comp.xlsx") #Comp
+crsp=read_excel("1963-2018 Crsp.xlsx") #Crsp
+Price=read_excel("Price-2018.xlsx") #Price
 Rf=read_excel("bond.xlsx")
 crsp01=crsp%>%left_join(Price) 
 
@@ -56,7 +56,7 @@ crsp1=crsp01%>%rename(price=`Price or Bid/Ask Average`)%>%
   rename(shrcd=`Share Code`)%>%
   filter(sic>6999|sic<6000)
   
-crsp2=crsp1%>%  
+crsp2=crsp1%>%  #calculate t as fiscal yearend
   mutate(t=floor((date-700)/10000))%>%
   group_by(permno,t)%>%
   mutate(year=substr(date,1,4))%>%
@@ -64,7 +64,7 @@ crsp2=crsp1%>%
                    has_June=any(month=="06"))%>%
   mutate(month=substr(date, 5, 6),has_Dec=any(month=="12"))%>%
   mutate(yearmonth=substr(date,1,6))%>%
-  filter(has_June==TRUE|t==1990)%>%
+  filter(has_June==TRUE|t==2018)%>% #1990 or 2018
   filter(has_Dec==TRUE)%>%
   filter(shrcd==10|shrcd==11|(is.na(shrcd)&!is.na(price)))%>%
   filter(exchange==1|exchange==2|exchange==3)%>%
@@ -97,7 +97,7 @@ crsp4=crsp3%>% ## figure out cumulative 24-60 months(for each permno)
   
 NYSE=crsp4%>% ## NYSE size portfolio number
   filter(exchange==1)%>%
-  filter(t>=1963)%>%  ##
+  filter(t>=1963)%>%  ##1963 or 1989
   group_by(t)%>%
   mutate(portfo=decile(MEt))%>%
   group_by(t,portfo)%>%
@@ -106,7 +106,7 @@ NYSE=crsp4%>% ## NYSE size portfolio number
 breakpoint=NYSE%>%select(t,portfo,value)%>%unique()%>%
   arrange(t,portfo)# produce unique NYSE breakpoint value
 
-bkpt2=crsp4%>%left_join(NYSE)%>%filter(t>=1963) ##
+bkpt2=crsp4%>%left_join(NYSE)%>%filter(t>=1963) ##1963 or 1989
 
 bkpt3=bkpt2%>%select(permno,t,portfo,MEt)%>%unique()
 
@@ -147,10 +147,10 @@ crsp6=crsp5%>%
   select(t,permno,portfo,month,sum2,Returns1)%>%
   group_by(permno)%>%
   arrange(desc(t),desc(month))%>%
-  mutate(lagsum=lead(sum2)) #Find the "next" or "previous" values in a vector.
+  mutate(lagsum=lead(sum2)) #Find the "next" or "previous" values in market return vector.arrange>desc>lead()
 
 crsp7=crsp5%>%
-  left_join(crsp6)
+  left_join(crsp6) #Be cautious to implement _join
 
 namelist=crsp7$permno%>%
   unique()
@@ -173,7 +173,11 @@ for(i in namelist){
       lm.pre=lm(testpno2$Returns1~testpno2$sum2+lag(testpno2$sum2))
       preranking=coefficients(lm.pre)
       beta=preranking[2]+preranking[3] 
-      crsp8$beta1[crsp8$permno==i&crsp8$t==k]=beta #数字
+      crsp8$beta1[crsp8$permno==i&crsp8$t==k]=beta 
+      #choose specific permno first, then filter t before specific k fiscalyear, value-weighted market
+      #return must be equal on a monthly basis every fiscalyear for various portfo. Then regress stock 
+      #return on current and previous monthly market return(sum2) one by one. And beta is the
+      #same for every stock in one fiscalyear(bcz of portfo)no matter which month happens.(one year beta acquired from a broad set sample data during 60 months at least 24)
     }
   }
 }  
@@ -181,20 +185,22 @@ for(i in namelist){
   crsp9=crsp8%>%
     left_join(crsp5)%>%
     filter(is.na(beta1)==F)
+ 
+  crsp99=crsp9%>%ungroup%>%select(t,exchange,portfo,permno,beta1)%>%unique()
   
-  crsp10=crsp9%>%
+  crsp10=crsp99%>%
     filter(exchange==1)%>%
-    filter(t>=1963)%>%
+    filter(t>=1963)%>% ##1963 or 1989
     group_by(t,portfo)%>%
     mutate(portfo2=decile(beta1))%>%
     group_by(t,portfo,portfo2)%>%
     mutate(value2=max(beta1)) #在NYSE里求出beta的分组和临界点（最大值）
  
    breakpoint2=crsp10%>%select(t,portfo,portfo2,value2)%>%unique()%>%
-    arrange(portfo2)# produce unique NYSE breakpoint value
+  arrange(portfo2)# produce unique NYSE breakpoint value
   
-  bkpt4=crsp9%>%left_join(crsp10)%>%filter(t>=1963) 
-  bkpt5=bkpt4%>%select(permno,exchange,portfo,portfo2,beta1,Returns,sum2,rf1,ME)%>%unique()
+  bkpt4=crsp9%>%ungroup%>%left_join(crsp10)%>%filter(t>=1963) ##1963 or 1989
+  bkpt5=bkpt4%>%select(t,permno,exchange,portfo,portfo2,beta1,Returns,sum2,rf1,ME)%>%unique()
   
   for(i in 1:length(bkpt5$t)){
     if(is.na(bkpt5$portfo2[i])==T){
@@ -278,10 +284,6 @@ for(i in namelist){
   }
   
   ##extract specific column or row,which should be supplemented with var[xxxx,]
- 
-Still a bit more revision on this version of code made in progress
-Q1: why post-ranking beta seemingly a little bit less than F&F Table-1, mostly centered btw 0-1?
-
 
 Another data cleaning example cited from Google Search:
  
