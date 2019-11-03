@@ -62,10 +62,10 @@ crsp2=crsp1%>%
   mutate(year=substr(date,1,4))%>%
   mutate(month=substr(date, 5, 6),
                    has_June=any(month=="06"))%>%
-  #mutate(month=substr(date, 5, 6),has_Dec=any(month=="12"))%>%
+  mutate(month=substr(date, 5, 6),has_Dec=any(month=="12"))%>%
   mutate(yearmonth=substr(date,1,6))%>%
-  filter(has_June==TRUE)%>%
-  #filter(has_Dec==TRUE)%>%
+  filter(has_June==TRUE|t==1990)%>%
+  filter(has_Dec==TRUE)%>%
   filter(shrcd==10|shrcd==11|(is.na(shrcd)&!is.na(price)))%>%
   filter(exchange==1|exchange==2|exchange==3)%>%
   mutate(price1=abs(price))%>%
@@ -81,7 +81,7 @@ crsp2$ME=crsp2$price1*crsp2$share/1000 ##calculate ME and filter as available
 filter(crsp2,ME>0)
   
 crsp2$y=ifelse(crsp2$month=='06',crsp2$ME,NA) ## add fixed yearly ME for every stock 
-crsp21=crsp2%>%group_by(permno)%>%arrange(permno,t)%>%mutate(y1=lag(y,12))
+crsp21=crsp2%>%group_by(permno)%>%arrange(permno,t)%>%mutate(y1=lag(y,1))
 crsp3=crsp21%>%  
   group_by(permno,t)%>%
   mutate(MEt=sum(y1,na.rm = TRUE))%>%
@@ -124,19 +124,21 @@ for(i in 1:length(bkpt3$permno)){
 test2=crsp4%>%
   select(t,permno,month,MEt)%>%
   filter(month==6)%>%
-  group_by(t)%>%
+  group_by(t,month)%>%
   mutate(sum1=sum(MEt))%>%
-  mutate(weight=MEt/sum1)%>%
-  mutate(lagweight=lag(weight))
+  mutate(weight=MEt/sum1)
+#  mutate(lagweight=lag(weight))
 
 test3=test2%>%
-  select(t,permno,MEt,weight,lagweight)
+  select(t,permno,MEt,weight)
   
 crsp5=crsp4%>%
   left_join(bkpt3)%>%
   left_join(test3)%>%
+  group_by(permno,t)%>%
+  mutate(wtd=sum(weight,na.rm = TRUE))%>%
+  mutate(val_wetReturn=Returns*wtd)%>%
   group_by(t,month)%>%
-  mutate(val_wetReturn=Returns*lagweight)%>%
   mutate(sum2=sum(val_wetReturn,na.rm = TRUE))
 
 crsp5$sum2=crsp5$sum2[]-crsp5$rf1[] # value-weighted portfolio Rm's excess return
@@ -161,13 +163,14 @@ for(i in namelist){
   year2=testpno$t%>% unique()
   for(k in year2){
     testpno2=testpno%>%
-    filter(t<k)
+    filter(t<k)%>%
+    group_by(t,month)
     if(length(testpno2$month)>=24){
       if(length(testpno2$month)>60){
         testpno2=testpno2%>%arrange(desc(t),desc(month))
         testpno2=testpno2[1:60,]
       }
-      lm.pre=lm(testpno2$Returns1~testpno2$sum2+testpno2$lagsum)
+      lm.pre=lm(testpno2$Returns1~testpno2$sum2+lag(testpno2$sum2))
       preranking=coefficients(lm.pre)
       beta=preranking[2]+preranking[3] 
       crsp8$beta1[crsp8$permno==i&crsp8$t==k]=beta #数字
@@ -182,12 +185,12 @@ for(i in namelist){
   crsp10=crsp9%>%
     filter(exchange==1)%>%
     filter(t>=1963)%>%
-    group_by(portfo)%>%
+    group_by(t,portfo)%>%
     mutate(portfo2=decile(beta1))%>%
-    group_by(portfo,portfo2)%>%
+    group_by(t,portfo,portfo2)%>%
     mutate(value2=max(beta1)) #在NYSE里求出beta的分组和临界点（最大值）
  
-   breakpoint2=crsp10%>%select(portfo,portfo2,value2)%>%unique()%>%
+   breakpoint2=crsp10%>%select(t,portfo,portfo2,value2)%>%unique()%>%
     arrange(portfo2)# produce unique NYSE breakpoint value
   
   bkpt4=crsp9%>%left_join(crsp10)%>%filter(t>=1963) 
