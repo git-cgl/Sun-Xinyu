@@ -8,20 +8,20 @@
 # Sections  : 
 #            (1) CRSP Data setup
 #            (2) Table 1 pre-beta, post-beta, post-beta (ln(ME))
-#            (3) 
+#            (3) From Google Search
 #           (**) CRSP and Compustat Data Merge)
 #           (**) Data Wrangling
 #-------------------------------------------------------------------------------------------------------
 ########################################################################################################
 
 rm(list=ls(all=TRUE)) ##clear all memory on previous program
-library(readr)         # For reading the data
-library(dplyr)         # Data wrangling
+######################################
+#1.The proper inference seems to be that there is a relation between size and
+#average return, but controlling for size, there is no relation between beta & average return.
+#(Tables I to III say that there is a strong relation between the average returns on stocks and size)
+#2.the combination of size and book-to-market equity absorbs the apparent roles of leverage and E/P in average stock returns.
+######################################
 
-
-#-----------------------------------
-# (1) CRSP Data setup/Adjustment/Size and Pre-ranking beta double-sorting/Post-ranking beta calculation
-#-----------------------------------
 
 library(readxl);library(dplyr);library(zoo);library(purrr);library(StatMeasures);
 require(data.table); library(lubridate)
@@ -200,19 +200,19 @@ for(i in namelist){
   arrange(portfo2)# produce unique NYSE breakpoint value
   
   bkpt4=crsp9%>%ungroup%>%left_join(crsp10)%>%filter(t>=1963) ##1963 or 1989
-  bkpt5=bkpt4%>%select(t,permno,exchange,portfo,portfo2,beta1,Returns,sum2,rf1,ME)%>%unique()
-  
-  for(i in 1:length(bkpt5$t)){
-    if(is.na(bkpt5$portfo2[i])==T){
-      test=breakpoint2$value2[breakpoint2$portfo==bkpt5$portfo[i]]
+  bkpt5=bkpt4%>%select(t,month,permno,exchange,portfo,portfo2,beta1,Returns,sum2,rf1,ME)%>%unique()
+  bkpt6=bkpt5#%>%ungroup%>%select(-month,-Returns,-sum2,-rf1,-ME)%>%unique()
+  for(i in 1:length(bkpt6$t)){
+    if(is.na(bkpt6$portfo2[i])==T){
+      test=breakpoint2$value2[breakpoint2$portfo==bkpt6$portfo[i]]
       k=1
-      while(k<10 & bkpt5$beta1[i]>test[k]){
+      while(k<10 & bkpt6$beta1[i]>test[k]){
         k=k+1
       }
-      bkpt5$portfo2[i]=k
+      bkpt6$portfo2[i]=k
     }
   }
-  crsp11=bkpt5
+  crsp11=bkpt6 #%>%right_join(bkpt6,c("t","permno","exchange","portfo","beta1"))
  # bkpt6=bkpt4%>%full_join(bkpt55)#%>%filter(is.na(Returns)==F)
   # crsp11=crsp11%>%
   #  left_join(bkpt5)%>%select(t,permno,portfo,sum2,Returns,portfo2)%>%
@@ -284,6 +284,10 @@ for(i in namelist){
   }
   
   ##extract specific column or row,which should be supplemented with var[xxxx,]
+  
+  #######################################
+  ##In short, our tests do not support the central prediction of the SLB model, that average stock returns are positively related to market β
+  
 
 Another data cleaning example cited from Google Search:
  
